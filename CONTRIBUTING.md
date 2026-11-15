@@ -4,7 +4,7 @@ Bu depoya hata bildirimi (issue) veya Pull Request (PR) ile katkıda bulunabilir
 
 ## Kurallar
 
-- **Dil:** Skill, ajan ve kural içerikleri Türkçe kalır. Yalnızca `README.md` İngilizce özet/karşılık olarak tutulur.
+- **Dil:** Skill, ajan ve kural içerikleri Türkçe kalır. Yalnızca `README.en.md` İngilizce özet/karşılık olarak tutulur.
 - **Gizlilik:** Kişisel dosya yolları (`C:\Users\...`), e-posta adresi, API anahtarı veya herhangi bir gizli bilgi eklemeyin.
 - **Doğrulama:** `install.ps1` değişikliklerinde mutlaka sahte bir hedef klasörle `-DryRun` testi çalıştırın:
 
