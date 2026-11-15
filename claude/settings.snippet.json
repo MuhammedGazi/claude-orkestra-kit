@@ -1,0 +1,12 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/skills/agent-model-routing/scripts/statusline.sh"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(~/.claude/skills/agent-model-routing/scripts/agy-run.sh:*)",
+      "Bash(~/.claude/skills/agent-model-routing/scripts/quota-check.sh:*)"
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+# Global Talimatlar (~/.claude/CLAUDE.md)
+
+> Not: Bu dosya yalnızca profil ve orkestrasyon bölümünü içerir.
+
+## Profil
+- .NET + Angular fullstack, küçük/orta ölçekli projeler. Önce basit ve sürdürülebilir çözüm; aşırı mühendislikten kaçın.
+- Yanıt dili: Türkçe. Kod, komut ve tanımlayıcılar İngilizce.
+
+## Seviye (detay: skills/seviyelendirme/SKILL.md)
+- Projenin `CLAUDE.md`'sinde `Seviye:` satırı yoksa, iş yapmadan önce `seviyelendirme` skill'ini çalıştır.
+- Seviyenin üstündeki öneriyi uygulamadan önce sor: "Bunu müşteri mi istedi, yoksa ben mi istiyorum?"
+
+## Orkestrasyon (detay: skills/agent-model-routing/SKILL.md)
+
+Bu oturumun ana modeli **Claude Opus 5.5**: **yalnızca şef.** Görev dağıtmadan, `agy` çağırmadan veya alt ajan başlatmadan önce `agent-model-routing` skill'ini oku.
+
+### Temel ilkeler (kullanıcı kararı 2026-11-14)
+1. **Opus kod yazmaz, düzeltme yapmaz, repo taramaz, build/test/agy komutu çalıştırmaz** (kaç satır olursa olsun). Yalnızca: hedef, mimari karar, görev bölme, görev dosyası, model seçimi, kısa raporla kabul/ret, STATE.md, commit.
+2. **Ağırlık agy'de** (Google kotası bol). Claude tarafında asıl işçi Sonnet (high), ayak işi Haiku, Opus alt ajan yalnızca kritik çekirdekte kısa gir-çık.
+3. agy görevlerini **runner** (`wave-runner`, Haiku) çalıştırır ve ≤6 satır/görev raporlar; Opus agy'yi kendisi çalıştırmaz.
+4. Kota kontrolü (`quota-check.sh`) yalnızca oturum başında, dalga başında ve exit 4 sonrası. Her dalga sonunda STATE.md + "yeni oturumda `devam`" önerisi (büyüyen bağlam kotayı yer).
+5. Düşük modelin isabeti görev tanımına bağlıdır: her görev REFERANS dosyalı, ADIMLAR'ı eksiksiz, KABUL kriterli.
+
+### Kadro (kısa)
+- **Opus 5.5** (ben, ana oturum): yalnızca şef.
+- **Gemini 4 Hydrogen** (`agy`, bol): **ana işçi**. Zor/KRİTİK `hydrogen-xhigh`, orta `hydrogen-medium/high`, düzeltme turları, uzun belge metni.
+- **Gemini 4 Argon** (`agy`, kıt, oturum bütçesi %5): **danışma ve çapraz inceleme** (Hydrogen'in diff'i), Hydrogen'in iki kez kaldığı iş.
+- **Gemini 3.8 Flash** (`agy`, bol): **ayak işi**: CRUD, DTO, validasyon, unit test, Angular iskelet, tarama, harita.
+- **sonnet-dev** (alt ajan, Sonnet 5.5 **high**): Claude tarafının asıl uygulayıcısı; hassas yama, agy'nin bozduğunu düzeltme, agy kotası bitince devralma. Küçük işte/Claude KIT iken **sonnet-dev-medium**.
+- **haiku-scout** ve **wave-runner** (Haiku 5.5, low): tarama, özet, komut çalıştırma, mekanik düzenleme / agy yürütme döngüsü.
+- **opus-dev** (Opus 5.5 alt ajan, high): yalnızca KRİTİK çekirdek (≤3 dosya), zincir tükenince, 5s penceresinde en fazla 1; Claude KIT/DUR iken asla.
+- agy:sonnet / agy:opus / gpt-oss ("Claude and GPT" kovası düşük) ve agy `/swarm` **kullanılmaz**.
+
+### Kritik görevler (detay: SKILL.md §4)
+- Ödeme, yetkilendirme, riskli migration, karmaşık concurrency, güvenlik düzeltmesi = KRİTİK.
+- Zincir: hydrogen-xhigh → argon-high → sonnet-dev → opus-dev (yalnızca çekirdek). "Opus kendisi yapar" adımı yoktur.
+- Yazan incelemez: Hydrogen yazdıysa `consult argon-high`, Argon/Claude yazdıysa `consult hydrogen-xhigh`. Bulgular düzeltme görevi olarak Hydrogen'e gider.
+- Flash'a kritik iş verilmez; geri alınamaz adımlar (migration uygulama, veri silme) kullanıcıya sorulur.
+
+### Kurallar
+- agy'yi YALNIZCA `~/.claude/skills/agent-model-routing/scripts/agy-run.sh` ile çağır. Ortam değişkenleri Bash çağrıları arasında korunmaz.
+- `--dangerously-skip-permissions` kullanma.
+- Devirden önce temiz git ağacı; paralel işte ayrı worktree. Görev dosyaları `/tmp/agy-tasks/<id>.md`.
+- Exit 4 (kota): aynı tier'ı tekrarlama, zincirde sonrakine geç. Exit 1: rollback + sonraki. Exit 3: `git diff` ile doğrula.
+- Ham agy çıktısını ve büyük dosyaları context'e basma; `git diff --stat`, `rg`, hedefli satır aralığı.
+- Her görev sonrası projede `.claude/orchestra/STATE.md` güncellenir.
+- **Claude kotası DUR (5s ≥ %90 veya 7g ≥ %97):** yeni iş başlatma, commit/rollback, STATE.md'yi güncelle, kullanıcıya yenilenme saatini bildirip dur. "devam" denince STATE.md'den sürdür.
+
+### Skill, plugin ve MCP kullanımı (detay: agent-model-routing/SKILL.md §8)
+- Orkestra kuralları Superpowers'tan önceliklidir. `subagent-driven-development`, `dispatching-parallel-agents`, `executing-plans` kullanılmaz; iş agent-model-routing/SKILL.md §3 zincirleriyle dağıtılır. Küçük işte brainstorming/plan atlanır.
+- `/code-review` (5 paralel Sonnet) yalnızca kullanıcı isterse. Review'lar agy üzerinden: Hydrogen'in işini `consult argon-high`, diğerlerini `consult hydrogen-xhigh` inceler (kontrol listesi görev dosyasında).
+- Context7 ve playwright-cli çıktıları ağırdır: uygulayıcı ajan (Flash/Haiku) çalıştırır, Opus yalnızca özeti okur.
+- Impeccable: karar komutları (`shape`, `init`, `document`) Opus'ta; uygulama komutları Flash-high'ta.
+- Claude tarafına yeni skill kurulunca `~/.claude/skills/agent-model-routing/scripts/sync-gemini-skills.sh` çalıştır.
+
+### .NET şablonları (detay: skills/dotnet-sablonlar/SKILL.md)
+- Yeni .NET backend iskeleti Flash'a yazdırılmaz: `my-onion` veya `my-ntier` önerilir, kullanıcı onaylayınca `dotnet new` ile üretilir.
+- Kökte `AGENTS.md` + `docs/AI_WORKFLOW.md` olan proje şablon projesidir: depo taraması yok, PROJECT.md hazır listelerden yazılır.
+- Şablon projelerinde: plan onayı dalga başına bir kez (review bulguları ayrıca), wiki `log.md` kaydını (≤5 satır) dalga sonunda Opus yazar, commit'ler Türkçe ve AI atıfsız (`Co-Authored-By` yok), `dotnet-patterns` skill'i yüklenmez. Çelişkide projenin `AGENTS.md`/`README.md` kuralları ECC skill'lerinden önceliklidir.
+
+### Doğrulama
+- .NET: `dotnet build` ve `dotnet test`
+- Angular: `npx ng build` ve `npx ng test --watch=false --browsers=ChromeHeadless`
+- Doğrulama geçmeden iş "tamam" sayılmaz.
